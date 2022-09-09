@@ -9,9 +9,13 @@ import rb2a
 
 def setUpModule():
     print('Creating fixture...')
-    global tempdir, testdata, rdiffrepo
+    global tempdir, testdata, rdiffrepo, password_file
     tempdir = tempfile.mkdtemp('rb2a_unittest')
     os.environ['TMPDIR'] = tempdir
+
+    password_file = os.path.join(tempdir, 'password-file')
+    with open(password_file, 'w') as f:
+        f.write('mdp')
 
     # first rdiff-backup increment
     testdata = os.path.join(tempdir, 'testdata')
@@ -44,8 +48,13 @@ Current mirror: Thu Sep 17 18:45:04 2015""".split('\n')
         self.assertEqual(increments[1], '2015-09-17T18:45:04')
 
     def test_attic_parse(self):
-        lines = """2015-09-17T18:44:09                  Sun Sep 20 13:58:44 2015
-2015-09-17T18:45:04                  Sun Sep 20 14:02:40 2015""".split('\n')
+        lines = """ID        Time                 Host        Tags        Paths
+------------------------------------------------------------------------------------
+eabbd6d7  2015-09-17 18:44:09  t420                    /tmp/tmp9hkeoq1wrb2a_unittest
+bc42bec7  2015-09-17 18:45:04  t420                    /tmp/tmp9hkeoq1wrb2a_unittest
+------------------------------------------------------------------------------------
+2 snapshots
+""".split('\n')
         archives = rb2a.parse_attic_archives(lines)
         self.assertEqual(len(archives), 2)
         self.assertEqual(archives[0], '2015-09-17T18:44:09')
@@ -83,10 +92,10 @@ Current mirror: Thu Sep 17 18:45:04 2015""".split('\n')
         rb2a.restore_rdiff_increment(rdiffrepo, destination_dir, '2015-10-01T08:00:00')
 
         attic_dir = os.path.join(tempdir, 'attic')
-        subprocess.check_call(['attic', 'init', attic_dir])
-        rb2a.attic_create(attic_dir, '2015-10-01T08:00:00', destination_dir)
+        subprocess.check_call(['restic', 'init','--password-file', password_file, '--repo', attic_dir])
+        rb2a.attic_create(attic_dir, '2015-10-01T08:00:00', destination_dir, password_file)
 
-        archives = rb2a.parse_attic_repo(attic_dir)
+        archives = rb2a.parse_attic_repo(attic_dir, password_file)
 
         shutil.rmtree(attic_dir)
         shutil.rmtree(destination_dir)
@@ -96,11 +105,11 @@ Current mirror: Thu Sep 17 18:45:04 2015""".split('\n')
 
     def test_convert_increment(self):
         attic_dir = os.path.join(tempdir, 'attic')
-        subprocess.check_call(['attic', 'init', attic_dir])
+        subprocess.check_call(['restic', 'init','--password-file', password_file, '--repo', attic_dir])
+        
+        rb2a.convert_increment(rdiffrepo, attic_dir, password_file, '2015-10-01T08:00:00')
 
-        rb2a.convert_increment(rdiffrepo, attic_dir, '2015-10-01T08:00:00')
-
-        archives = rb2a.parse_attic_repo(attic_dir)
+        archives = rb2a.parse_attic_repo(attic_dir, password_file)
 
         shutil.rmtree(attic_dir)
 

@@ -35,18 +35,20 @@ def parse_rdiff_increments(lines):
 
 def parse_attic_archives(lines):
     archives = []
-    for line in lines:
+    for line in lines[2:-3]:
         if len(line) == 0:
             continue
-        archives.append(line.split(' ')[0])
+        line_elts = line.split(' ')
+        s = "%s %s" % (line_elts[2], line_elts[3])
+        archives.append("%sT%s" % (line_elts[2], line_elts[3]))
     return archives
 
 def parse_rdiff_repo(path):
     lines = subprocess.check_output(['rdiff-backup', '--list-increments', path]).decode('utf-8').split('\n')
     return parse_rdiff_increments(lines)
 
-def parse_attic_repo(path):
-    lines = subprocess.check_output(['attic', 'list', path]).decode('utf-8').split('\n')
+def parse_attic_repo(path, password_file):
+    lines = subprocess.check_output(['restic', 'snapshots', '--password-file', password_file, '--repo', path]).decode('utf-8').split('\n')
     return parse_attic_archives(lines)
 
 def get_increments_to_convert(increments, archives):
@@ -56,16 +58,17 @@ def restore_rdiff_increment(rdiff_dir, destination_dir, increment):
     logging.info('Restoring rdiff-backup increment: %s' % increment)
     subprocess.check_call(['rdiff-backup', '-r', increment, rdiff_dir, destination_dir])
 
-def attic_create(attic_dir, archive_name, path):
+def attic_create(attic_dir, archive_name, path, password_file):
     logging.info('Creating attic archive: %s' % archive_name)
-    subprocess.check_call(['attic', 'create', '%s::%s' % (attic_dir, archive_name), path])
+    restic_date = archive_name.replace("T", " ")
+    subprocess.check_call(['restic', 'backup', '--password-file', password_file, '--repo', attic_dir, '--time=%s' % restic_date, path])
 
-def convert_increment(rdiff_dir, attic_dir, increment):
+def convert_increment(rdiff_dir, attic_dir, restic_passwordfile, increment):
     logging.info('Converting increment: %s' % increment)
     destination_dir = tempfile.mkdtemp('rb2a')
 
     restore_rdiff_increment(rdiff_dir, destination_dir, increment)
-    attic_create(attic_dir, increment, destination_dir)
+    attic_create(attic_dir, increment, destination_dir, restic_passwordfile)
 
     shutil.rmtree(destination_dir)
 
@@ -74,26 +77,29 @@ def run():
     parser.add_argument('-1', '--one', action = 'store_true')
     parser.add_argument('rdiff_dir', help = 'source rdiff-backup repository')
     parser.add_argument('attic_dir', help = 'destination attic repository')
+    parser.add_argument('restic_passwordfile', help = 'restic passwordfile')
 
     args = parser.parse_args()
 
     src = args.rdiff_dir
     dst = args.attic_dir
+    restic_passwordfile = args.restic_passwordfile
     logging.info('Source rdiff-backup directory: %s' % src)
     logging.info('Destination attic directory:%s' % dst)
+    logging.info('Destination restic passwordfile:%s' % restic_passwordfile)
 
     # check that source is rdiff-backup repo
     if not os.path.exists(os.path.join(src, 'rdiff-backup-data')):
         fail('"%s" does not look like rdiff-backup repository' % src)
 
     # check that destination is attic repo
-    if not os.path.exists(os.path.join(dst, 'config')):
-        fail('"%s" does not look like attic repository' % dst)
+    #if not os.path.exists(os.path.join(dst, 'config')):
+    #    fail('"%s" does not look like attic repository' % dst)
 
     increments = parse_rdiff_repo(src)
     logging.info('Found %d increments in rdiff-backup directory' % len(increments))
 
-    archives = parse_attic_repo(dst)
+    archives = parse_attic_repo(dst, restic_passwordfile)
     logging.info('Found %d archives in attic directory' % len(archives))
 
     to_convert = list(set(increments) - set(archives))
@@ -104,7 +110,7 @@ def run():
         if increment in archives:
             logging.info('Skipping already converted increment "%s"' % increment)
             continue
-        convert_increment(src, dst, increment)
+        convert_increment(src, dst, restic_passwordfile, increment)
 
         if args.one:
             logging.info('--one requested, so bailing out after first conversion')
