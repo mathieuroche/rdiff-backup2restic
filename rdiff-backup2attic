@@ -33,7 +33,7 @@ def parse_rdiff_increments(lines):
         increments.append(stamp.strftime('%Y-%m-%dT%H:%M:%S')) # FIXME timezone
     return increments
 
-def parse_attic_archives(lines):
+def parse_restic_archives(lines):
     archives = []
     for line in lines[2:-3]:
         if len(line) == 0:
@@ -47,9 +47,9 @@ def parse_rdiff_repo(path):
     lines = subprocess.check_output(['rdiff-backup', '--list-increments', path]).decode('utf-8').split('\n')
     return parse_rdiff_increments(lines)
 
-def parse_attic_repo(path, password_file):
+def parse_restic_repo(path, password_file):
     lines = subprocess.check_output(['restic', 'snapshots', '--password-file', password_file, '--repo', path]).decode('utf-8').split('\n')
-    return parse_attic_archives(lines)
+    return parse_restic_archives(lines)
 
 def get_increments_to_convert(increments, archives):
     return [increment for increment in increments if increment not in archives]
@@ -58,34 +58,34 @@ def restore_rdiff_increment(rdiff_dir, destination_dir, increment):
     logging.info('Restoring rdiff-backup increment: %s' % increment)
     subprocess.check_call(['rdiff-backup', '-r', increment, rdiff_dir, destination_dir])
 
-def attic_create(attic_dir, archive_name, path, password_file):
-    logging.info('Creating attic archive: %s' % archive_name)
+def restic_create(restic_dir, archive_name, path, password_file):
+    logging.info('Creating restic archive: %s' % archive_name)
     restic_date = archive_name.replace("T", " ")
-    subprocess.check_call(['restic', 'backup', '--password-file', password_file, '--repo', attic_dir, '--time=%s' % restic_date, path])
+    subprocess.check_call(['restic', 'backup', '--password-file', password_file, '--repo', restic_dir, '--time=%s' % restic_date, path])
 
-def convert_increment(rdiff_dir, attic_dir, restic_passwordfile, increment):
+def convert_increment(rdiff_dir, restic_dir, restic_passwordfile, increment):
     logging.info('Converting increment: %s' % increment)
     destination_dir = tempfile.mkdtemp('rb2a')
 
     restore_rdiff_increment(rdiff_dir, destination_dir, increment)
-    attic_create(attic_dir, increment, destination_dir, restic_passwordfile)
+    restic_create(restic_dir, increment, destination_dir, restic_passwordfile)
 
     shutil.rmtree(destination_dir)
 
 def run():
-    parser = argparse.ArgumentParser(description = 'Convert rdiff-backup repository increments into attic repository archives')
+    parser = argparse.ArgumentParser(description = 'Convert rdiff-backup repository increments into restic repository archives')
     parser.add_argument('-1', '--one', action = 'store_true')
     parser.add_argument('rdiff_dir', help = 'source rdiff-backup repository')
-    parser.add_argument('attic_dir', help = 'destination attic repository')
+    parser.add_argument('restic_dir', help = 'destination restic repository')
     parser.add_argument('restic_passwordfile', help = 'restic passwordfile')
 
     args = parser.parse_args()
 
     src = args.rdiff_dir
-    dst = args.attic_dir
+    dst = args.restic_dir
     restic_passwordfile = args.restic_passwordfile
     logging.info('Source rdiff-backup directory: %s' % src)
-    logging.info('Destination attic directory:%s' % dst)
+    logging.info('Destination restic directory:%s' % dst)
     logging.info('Destination restic passwordfile:%s' % restic_passwordfile)
 
     # check that source is rdiff-backup repo
@@ -99,14 +99,14 @@ def run():
     increments = parse_rdiff_repo(src)
     logging.info('Found %d increments in rdiff-backup directory' % len(increments))
 
-    archives = parse_attic_repo(dst, restic_passwordfile)
-    logging.info('Found %d archives in attic directory' % len(archives))
+    archives = parse_restic_repo(dst, restic_passwordfile)
+    logging.info('Found %d archives in restic directory' % len(archives))
 
     to_convert = list(set(increments) - set(archives))
     logging.info('New increments available for conversion: %d' % len(to_convert))
 
     for increment in increments:
-        #  check whether attic contains rdiff-backup increment as archive
+        #  check whether restic contains rdiff-backup increment as archive
         if increment in archives:
             logging.info('Skipping already converted increment "%s"' % increment)
             continue
