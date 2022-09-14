@@ -1,10 +1,10 @@
-# rdiff-backup2attic
+# rdiff-backup2restic
 
 Converts rdiff-backup repositories into restic repositories.
 
 ## Usage
 
-    rdiff-backup2attic <rdiff-backup-dir> <restic-dir>
+    rdiff-backup2restic <rdiff-backup-dir> <restic-dir>
 
 ## License
 
