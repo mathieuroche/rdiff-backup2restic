@@ -91,7 +91,11 @@ def run():
     # check that source is rdiff-backup repo
     if not os.path.exists(os.path.join(src, 'rdiff-backup-data')):
         fail('"%s" does not look like rdiff-backup repository' % src)
-
+    
+    # check restic passwordfile
+    if not os.path.exists(restic_passwordfile):
+        fail('"%s" does not exist' % restic_passwordfile)
+    
     # check that destination is restic repo
     if not os.path.exists(os.path.join(dst, 'config')):
         fail('"%s" does not look like restic repository' % dst)
