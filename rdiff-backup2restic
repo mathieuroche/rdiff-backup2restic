@@ -92,9 +92,9 @@ def run():
     if not os.path.exists(os.path.join(src, 'rdiff-backup-data')):
         fail('"%s" does not look like rdiff-backup repository' % src)
 
-    # check that destination is attic repo
-    #if not os.path.exists(os.path.join(dst, 'config')):
-    #    fail('"%s" does not look like attic repository' % dst)
+    # check that destination is restic repo
+    if not os.path.exists(os.path.join(dst, 'config')):
+        fail('"%s" does not look like restic repository' % dst)
 
     increments = parse_rdiff_repo(src)
     logging.info('Found %d increments in rdiff-backup directory' % len(increments))
