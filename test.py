@@ -104,7 +104,7 @@ bc42bec7  2015-09-17 18:45:04  t420                    /tmp/tmp9hkeoq1wrb2a_unit
         self.assertEqual(archives[0], '2015-10-01T08:00:00')
 
     def test_convert_increment(self):
-        restic_dir = os.path.join(tempdir, 'resic')
+        restic_dir = os.path.join(tempdir, 'restic')
         subprocess.check_call(['restic', 'init','--password-file', restic_passwordfile, '--repo', restic_dir])
         
         rb2r.convert_increment(rdiffrepo, restic_dir, restic_passwordfile, '2015-10-01T08:00:00')
