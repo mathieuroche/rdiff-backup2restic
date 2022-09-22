@@ -58,7 +58,7 @@ def list_arbo(root, nb = 2, depth = 1):
 
 class TestCDTE(unittest.TestCase):
     def test_change_arbo_encoding(self):
-        nb = cdte.change_arbo_encoding(tempdir)
+        nb = cdte.change_arbo_encoding(tempdir.decode())
         arbo_changed = []
         for root, dirs, files in os.walk(tempdir):
             for filename in files:

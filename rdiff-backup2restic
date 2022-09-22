@@ -77,7 +77,7 @@ def convert_increment(rdiff_dir, restic_dir, restic_passwordfile, increment, rep
     restic_create(restic_dir, increment, destination_dir, restic_passwordfile)
 
     if repair_encoding:
-        number_of_changes = cdte.change_arbo_encoding(destination_dir.encode('utf-8'))
+        number_of_changes = cdte.change_arbo_encoding(destination_dir)
         if number_of_changes > 0:
             restic_create(restic_dir, increment, destination_dir, restic_passwordfile, [encoding_repaired_tag])
 
