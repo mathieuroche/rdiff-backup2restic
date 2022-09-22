@@ -11,6 +11,8 @@ import shutil
 import sys
 import tempfile
 
+import cdte
+
 logging.basicConfig(format = '%(asctime)-15s %(levelname)s %(message)s', level = logging.INFO)
 
 def fail(msg):
@@ -58,23 +60,33 @@ def restore_rdiff_increment(rdiff_dir, destination_dir, increment):
     logging.info('Restoring rdiff-backup increment: %s' % increment)
     subprocess.check_call(['rdiff-backup', '-r', increment, rdiff_dir, destination_dir])
 
-def restic_create(restic_dir, archive_name, path, password_file):
+def restic_create(restic_dir, archive_name, path, password_file, tags = []):
     logging.info('Creating restic archive: %s' % archive_name)
     restic_date = archive_name.replace("T", " ")
-    subprocess.check_call(['restic', 'backup', '--password-file', password_file, '--repo', restic_dir, '--time=%s' % restic_date, path])
+    restic_cmd = ['restic', 'backup', '--password-file', password_file, '--repo', restic_dir, '--time=%s' % restic_date, path]
+    if tags:
+        restic_cmd.append('--tag=%s' % ",".join(tags))
+    subprocess.check_call(restic_cmd)
 
-def convert_increment(rdiff_dir, restic_dir, restic_passwordfile, increment):
+def convert_increment(rdiff_dir, restic_dir, restic_passwordfile, increment, repair_encoding = False, encoding_repaired_tag = ''):
     logging.info('Converting increment: %s' % increment)
     destination_dir = tempfile.mkdtemp('rb2a')
 
     restore_rdiff_increment(rdiff_dir, destination_dir, increment)
     restic_create(restic_dir, increment, destination_dir, restic_passwordfile)
+    
+    if repair_encoding:
+        nb = cdte.change_arbo_encoding(destination_dir.encode('utf-8'))
+        if nb > 0:
+            restic_create(restic_dir, increment, destination_dir, restic_passwordfile, [encoding_repaired_tag])
 
     shutil.rmtree(destination_dir)
 
 def run():
     parser = argparse.ArgumentParser(description = 'Convert rdiff-backup repository increments into restic repository archives')
     parser.add_argument('-1', '--one', action = 'store_true')
+    parser.add_argument('-r', '--repair-encoding', action = 'store_true', help = 'change directory tree encoding (ISO-8859-1 to UTF-8)')
+    parser.add_argument('-t', '--encoding-repaired-tag', action = 'store', default = "encoding-repaired", help = 'restic tag to use when encoding was changed')
     parser.add_argument('rdiff_dir', help = 'source rdiff-backup repository')
     parser.add_argument('restic_dir', help = 'destination restic repository')
     parser.add_argument('restic_passwordfile', help = 'restic passwordfile')
@@ -84,9 +96,13 @@ def run():
     src = args.rdiff_dir
     dst = args.restic_dir
     restic_passwordfile = args.restic_passwordfile
+    repair_encoding = args.repair_encoding
+    encoding_repaired_tag = args.encoding_repaired_tag
     logging.info('Source rdiff-backup directory: %s' % src)
     logging.info('Destination restic directory:%s' % dst)
     logging.info('Destination restic passwordfile:%s' % restic_passwordfile)
+    logging.info('Repair encoding :%s' % repair_encoding)
+    logging.info('Repaired encoding tag :%s' % encoding_repaired_tag)
 
     # check that source is rdiff-backup repo
     if not os.path.exists(os.path.join(src, 'rdiff-backup-data')):
@@ -114,7 +130,7 @@ def run():
         if increment in archives:
             logging.info('Skipping already converted increment "%s"' % increment)
             continue
-        convert_increment(src, dst, restic_passwordfile, increment)
+        convert_increment(src, dst, restic_passwordfile, increment, repair, encoding_repaired_tag)
 
         if args.one:
             logging.info('--one requested, so bailing out after first conversion')
