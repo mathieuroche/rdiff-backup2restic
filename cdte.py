@@ -4,9 +4,8 @@ import os
 logging.basicConfig(format = '%(asctime)-15s %(levelname)s %(message)s', level = logging.INFO)
 
 def change_arbo_encoding(directory, src_encoding = 'ISO-8859-1', dst_encoding = 'utf-8'):
-    number_of_changes = 0
-    
     logging.info('Change arborescence encoding of %s (%s=>%s)',directory, src_encoding, dst_encoding)
+    number_of_changes = 0
     for root, dirs, files in os.walk(directory.encode('utf-8')):
         for filename in files:
             try:
