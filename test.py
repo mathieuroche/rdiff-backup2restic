@@ -7,45 +7,46 @@ import unittest
 
 import rb2r
 
+TEMPDIR = tempfile.mkdtemp('rb2r_unittest')
+RESTIC_PASSWORDFILE = os.path.join(TEMPDIR, 'restic-passwordfile')
+RDIFF_DIR_WITH_UTF = os.path.join(TEMPDIR, 'rdiff1_dir')
+RDIFF_DIR_WITH_ISO = os.path.join(TEMPDIR, 'rdiff2_dir')
+DATA_DIR_WITH_UTF = os.path.join(TEMPDIR, 'data1_dir')
+DATA_DIR_WITH_ISO = os.path.join(TEMPDIR, 'data2_dir')
+
+
 def build_rsync(data_dir, rdiffrepo_dir, filename = b'data'):
-    
+
     # first rdiff-backup increment
     testdata = data_dir.encode('utf-8')
     os.mkdir(testdata)
-    with open(os.path.join(testdata, filename), 'w') as f:
-        f.write('first')
+    with open(os.path.join(testdata, filename), 'w', encoding='utf-8') as filep:
+        filep.write('first')
 
-    rdiffrepo = rdiffrepo_dir
-    subprocess.check_call(['faketime', '2015-10-01 08:00:00', 'rdiff-backup', testdata, rdiffrepo])
+    subprocess.check_call(['faketime', '2015-10-01 08:00:00', 'rdiff-backup', testdata, rdiffrepo_dir])
 
     # second rdiff-backup increment
-    with open(os.path.join(testdata, filename), 'w') as f:
-        f.write('second')
+    with open(os.path.join(testdata, filename), 'w', encoding='utf-8') as filep:
+        filep.write('second')
 
-    subprocess.check_call(['faketime', '2015-10-01 09:00:00', 'rdiff-backup', testdata, rdiffrepo])
+    subprocess.check_call(['faketime', '2015-10-01 09:00:00', 'rdiff-backup', testdata, rdiffrepo_dir])
 
 
 def setUpModule():
     print('Creating fixture...')
-    global tempdir, testdata, rdiffrepo, rdiffrepo2, restic_passwordfile
-    tempdir = tempfile.mkdtemp('rb2r_unittest')
-    os.environ['TMPDIR'] = tempdir
+    os.environ['TMPDIR'] = TEMPDIR
 
-    restic_passwordfile = os.path.join(tempdir, 'password-file')
-    with open(restic_passwordfile, 'w') as f:
-        f.write('mdp')
+    with open(RESTIC_PASSWORDFILE, 'w', encoding='utf-8') as filep:
+        filep.write('mdp')
 
-    rdiffrepo = os.path.join(tempdir, 'rdiff-repo')
-    build_rsync(os.path.join(tempdir, 'testdata'), rdiffrepo )
+    build_rsync(DATA_DIR_WITH_UTF, RDIFF_DIR_WITH_UTF)
 
-    rdiffrepo2 = os.path.join(tempdir, 'rdiff-repo2')
-    build_rsync(os.path.join(tempdir, 'testdata_with_iso'), rdiffrepo2, 'éçè'.encode("iso-8859-1"))
+    build_rsync(DATA_DIR_WITH_ISO, RDIFF_DIR_WITH_ISO, 'éçè'.encode("iso-8859-1"))
 
     print('OK')
 
 def tearDownModule():
-    global tempdir
-    shutil.rmtree(tempdir)
+    shutil.rmtree(TEMPDIR)
 
 class TestRB2R(unittest.TestCase):
     def test_rdiff_parse(self):
@@ -80,32 +81,32 @@ bc42bec7  2015-09-17 18:45:04  t420                    /tmp/tmp9hkeoq1wrb2a_unit
 
     # integration tests below
     def test_parse_rdiff_repo(self):
-        increments = rb2r.parse_rdiff_repo(rdiffrepo)
+        increments = rb2r.parse_rdiff_repo(RDIFF_DIR_WITH_UTF)
         self.assertEqual(len(increments), 2)
         # second can wary, depending on how long rdiff-backup takes to start up
         self.assertEqual(increments[0][:16], '2015-10-01T08:00')
         self.assertEqual(increments[1][:16], '2015-10-01T09:00')
 
     def test_restore_rdiff_increment(self):
-        destination_dir = os.path.join(tempdir, 'restore')
-        rb2r.restore_rdiff_increment(rdiffrepo, destination_dir, '2015-10-01T08:00:00')
+        destination_dir = os.path.join(TEMPDIR, 'restore')
+        rb2r.restore_rdiff_increment(RDIFF_DIR_WITH_UTF, destination_dir, '2015-10-01T08:00:00')
 
-        with open(os.path.join(tempdir, 'restore', 'data')) as f:
-            data = f.read()
+        with open(os.path.join(TEMPDIR, 'restore', 'data'), encoding='utf-8') as filep:
+            data = filep.read()
 
         shutil.rmtree(destination_dir)
 
         self.assertEqual(data, 'first')
 
     def test_restic_create(self):
-        destination_dir = os.path.join(tempdir, 'restore')
-        rb2r.restore_rdiff_increment(rdiffrepo, destination_dir, '2015-10-01T08:00:00')
+        destination_dir = os.path.join(TEMPDIR, 'restore')
+        rb2r.restore_rdiff_increment(RDIFF_DIR_WITH_UTF, destination_dir, '2015-10-01T08:00:00')
 
-        restic_dir = os.path.join(tempdir, 'restic')
-        subprocess.check_call(['restic', 'init','--password-file', restic_passwordfile, '--repo', restic_dir])
-        rb2r.restic_create(restic_dir, '2015-10-01T08:00:00', destination_dir, restic_passwordfile)
+        restic_dir = os.path.join(TEMPDIR, 'restic')
+        subprocess.check_call(['restic', 'init','--password-file', RESTIC_PASSWORDFILE, '--repo', restic_dir])
+        rb2r.restic_create(restic_dir, '2015-10-01T08:00:00', destination_dir, RESTIC_PASSWORDFILE)
 
-        archives = rb2r.parse_restic_repo(restic_dir, restic_passwordfile)
+        archives = rb2r.parse_restic_repo(restic_dir, RESTIC_PASSWORDFILE)
 
         shutil.rmtree(restic_dir)
         shutil.rmtree(destination_dir)
@@ -114,12 +115,12 @@ bc42bec7  2015-09-17 18:45:04  t420                    /tmp/tmp9hkeoq1wrb2a_unit
         self.assertEqual(archives[0], '2015-10-01T08:00:00')
 
     def test_convert_increment(self):
-        restic_dir = os.path.join(tempdir, 'restic')
-        subprocess.check_call(['restic', 'init','--password-file', restic_passwordfile, '--repo', restic_dir])
-        
-        rb2r.convert_increment(rdiffrepo, restic_dir, restic_passwordfile, '2015-10-01T08:00:00')
+        restic_dir = os.path.join(TEMPDIR, 'restic')
+        subprocess.check_call(['restic', 'init','--password-file', RESTIC_PASSWORDFILE, '--repo', restic_dir])
 
-        archives = rb2r.parse_restic_repo(restic_dir, restic_passwordfile)
+        rb2r.convert_increment(RDIFF_DIR_WITH_UTF, restic_dir, RESTIC_PASSWORDFILE, '2015-10-01T08:00:00')
+
+        archives = rb2r.parse_restic_repo(restic_dir, RESTIC_PASSWORDFILE)
 
         shutil.rmtree(restic_dir)
 
@@ -127,12 +128,12 @@ bc42bec7  2015-09-17 18:45:04  t420                    /tmp/tmp9hkeoq1wrb2a_unit
         self.assertEqual(archives[0], '2015-10-01T08:00:00')
 
     def test_convert_increment2(self):
-        restic_dir = os.path.join(tempdir, 'restic2')
-        subprocess.check_call(['restic', 'init','--password-file', restic_passwordfile, '--repo', restic_dir])
-        
-        rb2r.convert_increment(rdiffrepo2, restic_dir, restic_passwordfile, '2015-10-01T08:00:00', repair_encoding=True, encoding_repaired_tag='pouet')
+        restic_dir = os.path.join(TEMPDIR, 'restic2')
+        subprocess.check_call(['restic', 'init','--password-file', RESTIC_PASSWORDFILE, '--repo', restic_dir])
 
-        archives = rb2r.parse_restic_repo(restic_dir, restic_passwordfile)
+        rb2r.convert_increment(RDIFF_DIR_WITH_ISO, restic_dir, RESTIC_PASSWORDFILE, '2015-10-01T08:00:00', repair_encoding=True, encoding_repaired_tag='pouet')
+
+        archives = rb2r.parse_restic_repo(restic_dir, RESTIC_PASSWORDFILE)
 
         shutil.rmtree(restic_dir)
 
@@ -140,12 +141,12 @@ bc42bec7  2015-09-17 18:45:04  t420                    /tmp/tmp9hkeoq1wrb2a_unit
         self.assertEqual(archives[0], '2015-10-01T08:00:00')
 
     def test_convert_increment3(self):
-        restic_dir = os.path.join(tempdir, 'restic3')
-        subprocess.check_call(['restic', 'init','--password-file', restic_passwordfile, '--repo', restic_dir])
-        
-        rb2r.convert_increment(rdiffrepo, restic_dir, restic_passwordfile, '2015-10-01T08:00:00', repair_encoding=True, encoding_repaired_tag='pouet')
+        restic_dir = os.path.join(TEMPDIR, 'restic3')
+        subprocess.check_call(['restic', 'init','--password-file', RESTIC_PASSWORDFILE, '--repo', restic_dir])
 
-        archives = rb2r.parse_restic_repo(restic_dir, restic_passwordfile)
+        rb2r.convert_increment(RDIFF_DIR_WITH_UTF, restic_dir, RESTIC_PASSWORDFILE, '2015-10-01T08:00:00', repair_encoding=True, encoding_repaired_tag='pouet')
+
+        archives = rb2r.parse_restic_repo(restic_dir, RESTIC_PASSWORDFILE)
 
         shutil.rmtree(restic_dir)
 
