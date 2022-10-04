@@ -79,6 +79,24 @@ def restore_rdiff_increment(rdiff_dir, destination_dir, increment):
     subprocess.check_call(["rdiff-backup", "-r", increment, rdiff_dir, destination_dir])
 
 
+def restic_test(restic_dir, password_file):
+    logging.info("Testing restic : %s", restic_dir)
+    try:
+        subprocess.check_output(
+            [
+                "restic",
+                "snapshots",
+                "--password-file",
+                password_file,
+                "--repo",
+                restic_dir,
+            ]
+        )
+        return True
+    except subprocess.CalledProcessError:
+        return False
+
+
 def restic_create(restic_dir, archive_name, path, password_file, tags=None):
     if tags is None:
         tags = []
@@ -171,9 +189,9 @@ def run():
         fail(f'"{restic_passwordfile}" does not exist')
 
     # check that destination is restic repo
-    if not os.path.exists(os.path.join(dst, "config")):
+    if not restic_test(dst, restic_passwordfile):
         fail(f'"{dst}" does not look like restic repository')
-
+    
     increments = parse_rdiff_repo(src)
     logging.info("Found %d increments in rdiff-backup directory", len(increments))
 
