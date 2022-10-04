@@ -5,17 +5,20 @@ import tempfile
 
 import cdte
 
-TEMPDIR = tempfile.mkdtemp('cae_unittest').encode()
+TEMPDIR = tempfile.mkdtemp("cae_unittest").encode()
 ARBO = []
+
 
 def setUpModule():
     global ARBO
     ARBO = create_arbo(TEMPDIR, 2, 2)
 
+
 def tearDownModule():
     shutil.rmtree(TEMPDIR)
 
-def create_arbo(root, number_of_elements = 2, depth = 1):
+
+def create_arbo(root, number_of_elements=2, depth=1):
 
     result = []
 
@@ -28,16 +31,17 @@ def create_arbo(root, number_of_elements = 2, depth = 1):
     for i in range(number_of_elements):
         srep = os.path.join(root, b"%s%d" % (rep, i))
         os.mkdir(srep)
-        result.append(srep.decode("iso-8859-1").encode('utf8'))
+        result.append(srep.decode("iso-8859-1").encode("utf8"))
         for i in range(number_of_elements):
             sfic = os.path.join(srep, b"%s%d" % (fic, i))
-            with open(sfic, 'w', encoding='utf-8') as filep:
+            with open(sfic, "w", encoding="utf-8") as filep:
                 filep.write("test")
-            result.append(sfic.decode("iso-8859-1").encode('utf8'))
+            result.append(sfic.decode("iso-8859-1").encode("utf8"))
 
-        result = result + create_arbo(srep, number_of_elements, depth -1)
+        result = result + create_arbo(srep, number_of_elements, depth - 1)
 
     return result
+
 
 class TestCDTE(unittest.TestCase):
     def test_change_arbo_encoding(self):
@@ -59,5 +63,6 @@ class TestCDTE(unittest.TestCase):
         self.assertListEqual(expected_arbo, arbo_changed)
         self.assertEqual(number_of_changes, 18)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()
