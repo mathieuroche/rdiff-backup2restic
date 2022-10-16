@@ -59,10 +59,18 @@ def parse_rdiff_repo(path):
     return parse_rdiff_increments(lines)
 
 
-def parse_restic_repo(path, password_file):
+def parse_restic_repo(path, password_file, restic_args=""):
     lines = (
         subprocess.check_output(
-            ["restic", "snapshots", "--password-file", password_file, "--repo", path]
+            [
+                "restic",
+                "snapshots",
+                "--password-file",
+                password_file,
+                *restic_args.split(),
+                "--repo",
+                path,
+            ]
         )
         .decode("utf-8")
         .split("\n")
@@ -79,7 +87,7 @@ def restore_rdiff_increment(rdiff_dir, destination_dir, increment):
     subprocess.check_call(["rdiff-backup", "-r", increment, rdiff_dir, destination_dir])
 
 
-def restic_test(restic_dir, password_file):
+def restic_test(restic_dir, password_file, restic_args):
     logging.info("Testing restic : %s", restic_dir)
     try:
         subprocess.check_output(
@@ -88,6 +96,7 @@ def restic_test(restic_dir, password_file):
                 "snapshots",
                 "--password-file",
                 password_file,
+                *restic_args.split(),
                 "--repo",
                 restic_dir,
             ]
@@ -97,7 +106,9 @@ def restic_test(restic_dir, password_file):
         return False
 
 
-def restic_create(restic_dir, archive_name, path, password_file, tags=None):
+def restic_create(
+    restic_dir, archive_name, path, password_file, restic_args="", tags=None
+):
     if tags is None:
         tags = []
     logging.info("Creating restic archive: %s", archive_name)
@@ -107,6 +118,7 @@ def restic_create(restic_dir, archive_name, path, password_file, tags=None):
         "backup",
         "--password-file",
         password_file,
+        *restic_args.split(),
         "--repo",
         restic_dir,
         f"--time={restic_date}",
@@ -122,6 +134,7 @@ def convert_increment(
     restic_dir,
     restic_passwordfile,
     increment,
+    restic_args="",
     repair_encoding=False,
     encoding_repaired_tag="",
 ):
@@ -129,7 +142,9 @@ def convert_increment(
     destination_dir = tempfile.mkdtemp("rb2a")
 
     restore_rdiff_increment(rdiff_dir, destination_dir, increment)
-    restic_create(restic_dir, increment, destination_dir, restic_passwordfile)
+    restic_create(
+        restic_dir, increment, destination_dir, restic_passwordfile, restic_args
+    )
 
     if repair_encoding:
         number_of_changes = cdte.change_arbo_encoding(destination_dir)
@@ -139,6 +154,7 @@ def convert_increment(
                 increment,
                 destination_dir,
                 restic_passwordfile,
+                restic_args,
                 [encoding_repaired_tag],
             )
 
@@ -163,6 +179,13 @@ def run():
         default="encoding-repaired",
         help="restic tag to use when encoding was changed",
     )
+    parser.add_argument(
+        "-a",
+        "--restic-args",
+        action="store",
+        default="",
+        help="restic arguments",
+    )
     parser.add_argument("rdiff_dir", help="source rdiff-backup repository")
     parser.add_argument("restic_dir", help="destination restic repository")
     parser.add_argument("restic_passwordfile", help="restic passwordfile")
@@ -174,11 +197,12 @@ def run():
     restic_passwordfile = args.restic_passwordfile
     repair_encoding = args.repair_encoding
     encoding_repaired_tag = args.encoding_repaired_tag
+    restic_args = args.restic_args
     logging.info("Source rdiff-backup directory: %s", src)
     logging.info("Destination restic directory: %s", dst)
     logging.info("Destination restic passwordfile: %s", restic_passwordfile)
     logging.info("Repair encoding :%s", repair_encoding)
-    logging.info("Repaired encoding tag :%s", encoding_repaired_tag)
+    logging.info("Restic arguments :%s", restic_args)
 
     # check that source is rdiff-backup repo
     if not os.path.exists(os.path.join(src, "rdiff-backup-data")):
@@ -189,13 +213,13 @@ def run():
         fail(f'"{restic_passwordfile}" does not exist')
 
     # check that destination is restic repo
-    if not restic_test(dst, restic_passwordfile):
+    if not restic_test(dst, restic_passwordfile, restic_args):
         fail(f'"{dst}" does not look like restic repository')
-    
+
     increments = parse_rdiff_repo(src)
     logging.info("Found %d increments in rdiff-backup directory", len(increments))
 
-    archives = parse_restic_repo(dst, restic_passwordfile)
+    archives = parse_restic_repo(dst, restic_passwordfile, restic_args)
     logging.info("Found %d archives in restic directory", len(archives))
 
     to_convert = list(set(increments) - set(archives))
@@ -211,6 +235,7 @@ def run():
             dst,
             restic_passwordfile,
             increment,
+            restic_args,
             repair_encoding,
             encoding_repaired_tag,
         )
