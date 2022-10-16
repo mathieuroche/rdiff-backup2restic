@@ -137,9 +137,10 @@ def convert_increment(
     restic_args="",
     repair_encoding=False,
     encoding_repaired_tag="",
+    temp_dir=None,
 ):
     logging.info("Converting increment: %s", increment)
-    destination_dir = tempfile.mkdtemp("rb2a")
+    destination_dir = tempfile.mkdtemp("rb2a", dir=temp_dir)
 
     restore_rdiff_increment(rdiff_dir, destination_dir, increment)
     restic_create(
@@ -166,6 +167,7 @@ def run():
         description="Convert rdiff-backup repository increments into restic repository archives"
     )
     parser.add_argument("-1", "--one", action="store_true")
+    parser.add_argument("-d", "--temp-dir", action="store", default=None)
     parser.add_argument(
         "-r",
         "--repair-encoding",
@@ -198,11 +200,13 @@ def run():
     repair_encoding = args.repair_encoding
     encoding_repaired_tag = args.encoding_repaired_tag
     restic_args = args.restic_args
+    temp_dir = args.temp_dir
     logging.info("Source rdiff-backup directory: %s", src)
     logging.info("Destination restic directory: %s", dst)
     logging.info("Destination restic passwordfile: %s", restic_passwordfile)
     logging.info("Repair encoding :%s", repair_encoding)
     logging.info("Restic arguments :%s", restic_args)
+    logging.info("Tempdir: %s", temp_dir)
 
     # check that source is rdiff-backup repo
     if not os.path.exists(os.path.join(src, "rdiff-backup-data")):
@@ -215,6 +219,10 @@ def run():
     # check that destination is restic repo
     if not restic_test(dst, restic_passwordfile, restic_args):
         fail(f'"{dst}" does not look like restic repository')
+
+    # check that temp_dir exists
+    if temp_dir and not os.path.exists(temp_dir):
+        fail(f'"{temp_dir}" does not exist')
 
     increments = parse_rdiff_repo(src)
     logging.info("Found %d increments in rdiff-backup directory", len(increments))
