@@ -204,8 +204,8 @@ def run():
     logging.info("Source rdiff-backup directory: %s", src)
     logging.info("Destination restic directory: %s", dst)
     logging.info("Destination restic passwordfile: %s", restic_passwordfile)
-    logging.info("Repair encoding :%s", repair_encoding)
-    logging.info("Restic arguments :%s", restic_args)
+    logging.info("Repair encoding: %s", repair_encoding)
+    logging.info("Restic arguments: %s", restic_args)
     logging.info("Tempdir: %s", temp_dir)
 
     # check that source is rdiff-backup repo
