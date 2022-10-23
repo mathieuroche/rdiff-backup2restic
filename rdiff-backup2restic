@@ -13,6 +13,9 @@ import tempfile
 
 import cdte
 
+RESTIC = "restic"
+RDIFF_BACKUP = "rdiff-backup"
+
 logging.basicConfig(
     format="%(asctime)-15s %(levelname)s %(message)s", level=logging.INFO
 )
@@ -52,7 +55,7 @@ def parse_restic_archives(lines):
 
 def parse_rdiff_repo(path):
     lines = (
-        subprocess.check_output(["rdiff-backup", "--list-increments", path])
+        subprocess.check_output([RDIFF_BACKUP, "--list-increments", path])
         .decode("utf-8")
         .split("\n")
     )
@@ -63,7 +66,7 @@ def parse_restic_repo(path, password_file, restic_args=""):
     lines = (
         subprocess.check_output(
             [
-                "restic",
+                RESTIC,
                 "snapshots",
                 "--password-file",
                 password_file,
@@ -84,7 +87,7 @@ def get_increments_to_convert(increments, archives):
 
 def restore_rdiff_increment(rdiff_dir, destination_dir, increment):
     logging.info("Restoring rdiff-backup increment: %s", increment)
-    subprocess.check_call(["rdiff-backup", "-r", increment, rdiff_dir, destination_dir])
+    subprocess.check_call([RDIFF_BACKUP, "-r", increment, rdiff_dir, destination_dir])
 
 
 def restic_test(restic_dir, password_file, restic_args):
@@ -92,7 +95,7 @@ def restic_test(restic_dir, password_file, restic_args):
     try:
         subprocess.check_output(
             [
-                "restic",
+                RESTIC,
                 "snapshots",
                 "--password-file",
                 password_file,
@@ -114,7 +117,7 @@ def restic_create(
     logging.info("Creating restic archive: %s", archive_name)
     restic_date = archive_name.replace("T", " ")
     restic_cmd = [
-        "restic",
+        RESTIC,
         "backup",
         "--password-file",
         password_file,
