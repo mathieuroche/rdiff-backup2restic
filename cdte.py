@@ -17,7 +17,7 @@ def make_writeable(directory, dry_run=False):
 
 
 def change_arbo_encoding(
-    directory, src_encoding="ISO-8859-1", dst_encoding="utf-8", dry_run=False
+    directory, src_encoding="iso-8859-1", dst_encoding="utf-8", dry_run=False
 ):
     logging.info(
         "Change arborescence encoding of %s (%s=>%s)",
@@ -26,7 +26,7 @@ def change_arbo_encoding(
         dst_encoding,
     )
     number_of_changes = 0
-    for root, dirs, files in os.walk(directory.encode("utf-8")):
+    for root, dirs, files in os.walk(directory.encode(dst_encoding)):
         for filename in files:
             try:
                 decoded = filename.decode(dst_encoding)

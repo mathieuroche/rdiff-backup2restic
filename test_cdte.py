@@ -25,18 +25,20 @@ def create_arbo(root, number_of_elements=2, depth=1):
     if depth == 0:
         return result
 
-    rep = "répertoire".encode("iso-8859-1")
-    fic = "fiçhié".encode("iso-8859-1")
+    iso = "iso-8859-1"
+    utf = "utf-8"
+    rep = "répertoire".encode(iso)
+    fic = "fiçhié".encode(iso)
 
     for i in range(number_of_elements):
         srep = os.path.join(root, b"%s%d" % (rep, i))
         os.mkdir(srep)
-        result.append(srep.decode("iso-8859-1").encode("utf8"))
+        result.append(srep.decode(iso).encode(utf))
         for i in range(number_of_elements):
             sfic = os.path.join(srep, b"%s%d" % (fic, i))
-            with open(sfic, "w", encoding="utf-8") as filep:
+            with open(sfic, "w", encoding=utf) as filep:
                 filep.write("test")
-            result.append(sfic.decode("iso-8859-1").encode("utf8"))
+            result.append(sfic.decode(iso).encode(utf))
 
         result = result + create_arbo(srep, number_of_elements, depth - 1)
 
