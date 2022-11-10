@@ -1,12 +1,24 @@
 import logging
 import os
+import stat
 
 logging.basicConfig(
     format="%(asctime)-15s %(levelname)s %(message)s", level=logging.INFO
 )
 
 
-def change_arbo_encoding(directory, src_encoding="ISO-8859-1", dst_encoding="utf-8"):
+def make_writeable(directory, dry_run=False):
+    if not os.access(directory, os.W_OK):
+        logging.info("No write access in '%s'", directory)
+        logging.info("chmod u+w '%s'", directory)
+        if not dry_run:
+            stat_result = os.stat(directory)
+            os.chmod(directory, stat_result.st_mode | stat.S_IWUSR)
+
+
+def change_arbo_encoding(
+    directory, src_encoding="ISO-8859-1", dst_encoding="utf-8", dry_run=False
+):
     logging.info(
         "Change arborescence encoding of %s (%s=>%s)",
         directory,
@@ -24,7 +36,9 @@ def change_arbo_encoding(directory, src_encoding="ISO-8859-1", dst_encoding="utf
                 dst = os.path.join(root, decoded.encode(dst_encoding))
                 logging.info("Rename %s => %s", src, dst)
                 number_of_changes = number_of_changes + 1
-                os.rename(src, dst)
+                make_writeable(root, dry_run)
+                if not dry_run:
+                    os.rename(src, dst)
 
         for dirname in dirs:
             try:
@@ -35,7 +49,9 @@ def change_arbo_encoding(directory, src_encoding="ISO-8859-1", dst_encoding="utf
                 dst = os.path.join(root, decoded.encode(dst_encoding))
                 logging.info("Rename %s => %s", src, dst)
                 number_of_changes = number_of_changes + 1
-                os.rename(src, dst)
+                make_writeable(root, dry_run)
+                if not dry_run:
+                    os.rename(src, dst)
                 dirs.append(decoded.encode(dst_encoding))
 
     return number_of_changes

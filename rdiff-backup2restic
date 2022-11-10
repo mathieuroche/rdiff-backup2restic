@@ -7,11 +7,11 @@ import logging
 import os
 import re
 import subprocess
-import shutil
 import sys
 import tempfile
 
 import cdte
+import rmtreero
 
 RESTIC = "restic"
 RDIFF_BACKUP = "rdiff-backup"
@@ -167,7 +167,7 @@ def convert_increment(
                 [encoding_repaired_tag],
             )
 
-    shutil.rmtree(destination_dir)
+    rmtreero.rmtree(destination_dir)
 
 
 def run():
